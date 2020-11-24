@@ -1,0 +1,71 @@
+import requests
+from bs4 import BeautifulSoup
+import csv
+import pandas as pd
+
+def initial_parse(page_link):
+    html_page = requests.get(page_link)
+
+    soup = BeautifulSoup(html_page.content, 'html.parser')
+
+    #Find Section of website
+    section = soup.find('div', class_='list-group geo-major')
+
+    #In the Html code there are two 'divs' titled list-group geo-major
+    list_links = section.find_next('div')
+
+    dictionary = {county.a['title'] : county.a['href'] for county in list_links.find_all('li')}
+    return dictionary
+
+def get_address(zed):
+    html_page = requests.get(zed)
+
+    soup = BeautifulSoup(html_page.content, 'html.parser')
+
+    # Find Section of website
+    section = soup.find('div', class_='listings')
+
+    check = section.find_all('p', class_= 'condensed-listing alt')
+
+    final_dict = {}
+    col_names = ['Name of Center', 'City-State','Address','ZipCode']
+    df  = pd.DataFrame(columns=col_names) #TODO Output a DataFrame Instead of Dictionary
+    for i in check:
+        name = i.find('span', class_='name').contents
+
+        city_state = i.find('span', class_='city-state').contents
+
+        address = i.find('span', class_='subsidiary').find('span', class_='address').contents
+
+        zip_code = i.find('span', class_='subsidiary').find('span', class_='zipcode').contents
+
+        final_dict[name[0]] = []
+        final_dict[name[0]].append(city_state)
+        final_dict[name[0]].append(address)
+        final_dict[name[0]].append(zip_code)
+
+
+
+    return final_dict
+
+
+#This is the link I'm scraping from
+page_link = 'https://www.recycling-center.org/michigan/'
+
+diction = initial_parse(page_link)
+keys = []
+testing = []
+for key, urls in diction.items():
+    keys.append(key)
+    test = 'https://www.recycling-center.org'+urls
+    testing.append(test)
+
+bet = testing[0]
+dict_perCounty = []
+for x in testing:
+    dict_perCounty.append(get_address(x))
+
+# dict_forCSV = dict(zip(keys,dict_perCounty))
+
+new = pd.DataFrame.from_dict(dict_perCounty)
+print(new) #TODO once finaly Pandas DataFrame is created, output this to a CSV
