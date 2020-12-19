@@ -1,0 +1,67 @@
+import geopandas as gpd
+import geopy
+from geopy.geocoders import Nominatim
+import pandas as pd
+import numpy as np
+import dash
+import dash_table
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.graph_objs as go
+
+data = pd.read_csv("michigan_recycle.csv")
+
+mapbox_access_token = 'pk.eyJ1IjoidGltYnp5LXdpbiIsImEiOiJja2h5NTZmNzAwY2xjMnFvMjZuemRvaDJhIn0.euP5ZLpZ1Y_AGM6Boxgj8Q'
+
+data['ADDRESS'] = data['Address'] + ',' + \
+                data['City-State'] + ',' + \
+                data['ZipCode'].astype(str) + ',' + ' United States '
+
+# county = data.iloc[0]['County']
+# address = data.iloc[0]['Address']
+# city_state = data.iloc[0]['City-State']
+# temp_zip = data.iloc[0]['ZipCode']
+# zip = str(temp_zip)
+
+locator = Nominatim(user_agent="myGeocoder")
+
+from geopy.extra.rate_limiter import RateLimiter
+geocode = RateLimiter(locator.geocode, min_delay_seconds=1)
+data['location'] = data['ADDRESS'].apply(geocode)
+data['point'] = data['location'].apply(lambda loc: tuple(loc.point) if loc else None)
+# split point column into latitude, longitude and altitude columns
+data[['latitude', 'longitude', 'altitude']] = pd.DataFrame(data['point'].tolist(), index=data.index)
+
+data = data.drop(['Index', 'County', 'City-State', 'Address','ZipCode', 'ADDRESS', 'location', 'point','altitude'], axis=1)
+
+data = data[pd.notnull(data["latitude"])]
+
+standard_style = "mapbox://styles/timbzy-win/ckiw49n5p4gzp19ocvci22qns"
+#set the geo=spatial data
+fig = go.Figure(go.Scattermapbox(
+            text=data['Name of Center'],
+            lat= data['latitude'],
+            lon= data['longitude'],
+            # customdata = data['Name of Center'],
+            mode='markers',
+            marker=dict(
+                size= 9,
+                color = '#800080',
+                opacity = .8,
+            ),
+          ))
+#set the layout to plot
+fig.update_layout(autosize=False,
+                   mapbox= dict(accesstoken=mapbox_access_token,
+                                bearing=0,
+                                pitch=0,
+                                zoom=5,
+                                center= dict(lat=44.978718,
+                                             lon=-84.515887),
+                                style=standard_style),
+                    width=1500,
+                    height=800,
+                    title = "Recycle Centers in Michigan"
+                  )
+fig.show()
